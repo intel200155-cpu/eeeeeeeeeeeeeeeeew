@@ -10,29 +10,34 @@ local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
 -- ------------------------------------------------------------------
--- Custom Base64 Decoder (pure Lua – works on all executors)
+-- Clean, working Base64 decoder (handles padding '=' gracefully)
 -- ------------------------------------------------------------------
 local function base64_decode(data)
     local b64chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
-    local result = {}
+    -- Remove any characters not in base64 alphabet or '='
     data = string.gsub(data, '[^'..b64chars..'=]', '')
+    local result = {}
     for i = 1, #data, 4 do
-        local a = string.find(b64chars, string.sub(data, i, i), 1, true) - 1
-        local b = string.find(b64chars, string.sub(data, i+1, i+1), 1, true) - 1
-        local c = string.find(b64chars, string.sub(data, i+2, i+2), 1, true) - 1
-        local d = string.find(b64chars, string.sub(data, i+3, i+3), 1, true) - 1
-        if not a then a = 0 end
-        if not b then b = 0 end
-        if not c then c = 0 end
-        if not d then d = 0 end
-        local byte1 = (a * 4 + math.floor(b / 16)) % 256
-        local byte2 = ((b % 16) * 16 + math.floor(c / 4)) % 256
-        local byte3 = ((c % 4) * 64 + d) % 256
+        local chunk = string.sub(data, i, i+3)
+        local a, b, c, d = string.byte(chunk, 1, 4)
+        -- Get index of each char, handling nil for padding
+        local a64 = a and string.find(b64chars, string.char(a), 1, true) or 0
+        local b64 = b and string.find(b64chars, string.char(b), 1, true) or 0
+        local c64 = c and string.find(b64chars, string.char(c), 1, true) or 0
+        local d64 = d and string.find(b64chars, string.char(d), 1, true) or 0
+        a64 = a64 - 1
+        b64 = b64 - 1
+        c64 = c64 - 1
+        d64 = d64 - 1
+        -- Convert 4 base64 chars to 3 bytes
+        local byte1 = (a64 * 4) + math.floor(b64 / 16)
+        local byte2 = ((b64 % 16) * 16) + math.floor(c64 / 4)
+        local byte3 = ((c64 % 4) * 64) + d64
         table.insert(result, string.char(byte1))
-        if c ~= 64 then
+        if c and c ~= 61 then -- '=' is ASCII 61
             table.insert(result, string.char(byte2))
         end
-        if d ~= 64 then
+        if d and d ~= 61 then
             table.insert(result, string.char(byte3))
         end
     end
